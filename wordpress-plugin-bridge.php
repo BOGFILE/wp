@@ -33,6 +33,11 @@ function faap_setup_database() {
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql_apps);
     dbDelta($sql_forms);
+
+    // Set default frontend URL if not set yet.
+    if (!get_option('faap_frontend_url')) {
+        add_option('faap_frontend_url', 'https://prominencebank.com:9002/');
+    }
 }
 
 // 2. REST API Endpoints
@@ -59,12 +64,27 @@ add_action('rest_api_init', function () {
     ));
 });
 
+add_filter('rest_pre_serve_request', function($value) {
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+    header('Access-Control-Allow-Headers: Authorization, Content-Type');
+    return $value;
+});
+
 function faap_get_form_config($data) {
     global $wpdb;
-    $type = $data['type'];
+    $type = sanitize_text_field($data['type'] ?? 'personal');
     $table_forms = $wpdb->prefix . 'faap_forms';
     $config = $wpdb->get_var($wpdb->prepare("SELECT config FROM $table_forms WHERE form_type = %s", $type));
-    return $config ? json_decode($config) : [];
+    if (!$config) {
+        return rest_ensure_response([]);
+    }
+
+    $decoded = json_decode($config, true);
+    if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+        return rest_ensure_response([]);
+    }
+    return rest_ensure_response($decoded);
 }
 
 function faap_save_uploaded_file($file, $prefix = 'faap') {
@@ -143,71 +163,76 @@ function faap_handle_submission($request) {
     $params = $request->get_json_params();
     if (empty($params) && !empty($_POST)) {
         $params = $_POST;
-        if (isset($_POST['applicationData'])) {
-            $decoded = json_decode(stripslashes($_POST['applicationData']), true);
-            if (is_array($decoded)) {
-                $params = array_merge($params, $decoded);
-            }
-        }
     }
     if (!is_array($params)) {
         $params = [];
     }
 
-    $params['type'] = $params['type'] ?? 'personal';
-    $params['accountTypeId'] = $params['accountTypeId'] ?? '';
-    $params['applicationId'] = $params['applicationId'] ?? 'APP-' . strtoupper(uniqid());
+    if (isset($params['applicationData']) && is_string($params['applicationData'])) {
+        $decoded = json_decode(stripslashes($params['applicationData']), true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            $params = array_merge($params, $decoded);
+        }
+    }
+
+    $params['type'] = in_array($params['type'] ?? 'personal', ['personal', 'business'], true) ? $params['type'] : 'personal';
+    $params['accountTypeId'] = sanitize_text_field($params['accountTypeId'] ?? '');
+    $params['applicationId'] = sanitize_text_field($params['applicationId'] ?? 'APP-' . strtoupper(uniqid()));
     $params['status'] = 'Pending';
 
-    if (!empty($_FILES['mainDocumentFile'])) {
-        $saved = faap_save_uploaded_file($_FILES['mainDocumentFile'], 'main_document');
-        if ($saved) {
-            $params['mainDocumentFile'] = $saved;
+    try {
+        if (!empty($_FILES['mainDocumentFile'])) {
+            $saved = faap_save_uploaded_file($_FILES['mainDocumentFile'], 'main_document');
+            if ($saved) {
+                $params['mainDocumentFile'] = $saved;
+            }
         }
-    }
-    if (!empty($_FILES['paymentProofFile'])) {
-        $saved = faap_save_uploaded_file($_FILES['paymentProofFile'], 'payment_proof');
-        if ($saved) {
-            $params['paymentProofFile'] = $saved;
+        if (!empty($_FILES['paymentProofFile'])) {
+            $saved = faap_save_uploaded_file($_FILES['paymentProofFile'], 'payment_proof');
+            if ($saved) {
+                $params['paymentProofFile'] = $saved;
+            }
         }
-    }
-    if (!empty($_FILES['companyRegFile'])) {
-        $saved = faap_save_uploaded_file($_FILES['companyRegFile'], 'company_reg');
-        if ($saved) {
-            $params['companyRegFile'] = $saved;
+        if (!empty($_FILES['companyRegFile'])) {
+            $saved = faap_save_uploaded_file($_FILES['companyRegFile'], 'company_reg');
+            if ($saved) {
+                $params['companyRegFile'] = $saved;
+            }
         }
+
+        $form_data_json = wp_json_encode($params);
+        $inserted = $wpdb->insert($table_apps, [
+            'type' => $params['type'],
+            'account_type_id' => $params['accountTypeId'],
+            'status' => 'Pending',
+            'form_data' => $form_data_json,
+        ]);
+
+        if (!$inserted) {
+            return new WP_Error('db_err', 'Failed to save application.');
+        }
+
+        $email_subject = sanitize_text_field($params['emailSubject'] ?? 'Application Received - Prominence Bank');
+        $application_id = sanitize_text_field($params['applicationId']);
+        $user_email = sanitize_email($params['email'] ?? $params['signatoryEmail'] ?? '');
+        $admin_email = sanitize_email(get_option('admin_email'));
+
+        $full_body = faap_build_application_html($params);
+        $headers = array('Content-Type: text/html; charset=UTF-8');
+        $attachments = [];
+        if (!empty($params['mainDocumentFile'])) $attachments[] = $params['mainDocumentFile'];
+        if (!empty($params['paymentProofFile'])) $attachments[] = $params['paymentProofFile'];
+        if (!empty($params['companyRegFile'])) $attachments[] = $params['companyRegFile'];
+
+        if (!empty($user_email)) {
+            wp_mail($user_email, $email_subject, $full_body, $headers, $attachments);
+        }
+        wp_mail($admin_email, "NEW APPLICATION: " . $application_id, $full_body, $headers, $attachments);
+
+        return rest_ensure_response(['success' => true, 'id' => $wpdb->insert_id, 'applicationId' => $application_id]);
+    } catch (Exception $e) {
+        return new WP_Error('submission_error', 'Application submission error: ' . $e->getMessage(), ['status' => 500]);
     }
-
-    $form_data_json = json_encode($params);
-    $result = $wpdb->insert($table_apps, [
-        'type' => $params['type'],
-        'account_type_id' => $params['accountTypeId'],
-        'status' => 'Pending',
-        'form_data' => $form_data_json,
-    ]);
-
-    $email_subject = $params['emailSubject'] ?? 'Application Received - Prominence Bank';
-    $application_id = $params['applicationId'];
-    $user_email = $params['email'] ?? $params['signatoryEmail'] ?? '';
-    $admin_email = get_option('admin_email');
-
-    $full_body = faap_build_application_html($params);
-    $headers = array('Content-Type: text/html; charset=UTF-8');
-    $attachments = [];
-    if (!empty($params['mainDocumentFile'])) $attachments[] = $params['mainDocumentFile'];
-    if (!empty($params['paymentProofFile'])) $attachments[] = $params['paymentProofFile'];
-    if (!empty($params['companyRegFile'])) $attachments[] = $params['companyRegFile'];
-
-    if (!empty($user_email)) {
-        wp_mail($user_email, $email_subject, $full_body, $headers, $attachments);
-    }
-    wp_mail($admin_email, "NEW APPLICATION: " . $application_id, $full_body, $headers, $attachments);
-
-    if ($result) {
-        return ['success' => true, 'id' => $wpdb->insert_id, 'applicationId' => $application_id];
-    }
-
-    return new WP_Error('db_err', 'Failed to save application');
 }
 
 function faap_get_applications() {
@@ -231,6 +256,30 @@ function faap_get_applications() {
     }, $applications);
     
     return $formatted_apps;
+}
+
+function faap_get_default_form_steps() {
+    return [
+        [
+            'id' => 'step-1',
+            'order' => 1,
+            'title' => 'Initial Account Details',
+            'description' => 'Basic account selection fields',
+            'fields' => [
+                ['id' => 'f1', 'label' => 'Full Name', 'name' => 'fullName', 'type' => 'text', 'width' => 'full', 'required' => true],
+                ['id' => 'f2', 'label' => 'Email', 'name' => 'email', 'type' => 'email', 'width' => 'full', 'required' => true],
+            ],
+        ],
+        [
+            'id' => 'step-2',
+            'order' => 2,
+            'title' => 'Address',
+            'description' => 'Contact information',
+            'fields' => [
+                ['id' => 'f3', 'label' => 'Address', 'name' => 'address', 'type' => 'text', 'width' => 'full', 'required' => true],
+            ],
+        ],
+    ];
 }
 
 function faap_verify_payment($request) {
@@ -334,10 +383,21 @@ function faap_admin_manage_forms() {
         }
     }
 
-    $personal = $wpdb->get_var("SELECT config FROM $table_forms WHERE form_type = 'personal'");
-    $business = $wpdb->get_var("SELECT config FROM $table_forms WHERE form_type = 'business'");
-    $personalJson = $personal ? $personal : '[]';
-    $businessJson = $business ? $business : '[]';
+    $personal = $wpdb->get_var($wpdb->prepare("SELECT config FROM $table_forms WHERE form_type = %s", 'personal'));
+    $business = $wpdb->get_var($wpdb->prepare("SELECT config FROM $table_forms WHERE form_type = %s", 'business'));
+
+    // Ensure valid JSON for the editor defaults.
+    $personalData = json_decode($personal, true);
+    if (json_last_error() !== JSON_ERROR_NONE || !is_array($personalData)) {
+        $personalData = faap_get_default_form_steps();
+    }
+    $businessData = json_decode($business, true);
+    if (json_last_error() !== JSON_ERROR_NONE || !is_array($businessData)) {
+        $businessData = faap_get_default_form_steps();
+    }
+
+    $personalJson = json_encode($personalData, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+    $businessJson = json_encode($businessData, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
     ?>
     <div class="wrap">
         <h1>Manage Form Steps (Visual Editor)</h1>
@@ -593,7 +653,12 @@ function faap_admin_manage_forms() {
 }
 
 add_shortcode('financial_form', function($atts) {
-    $url = get_option('faap_frontend_url', 'http://3.14.204.157:9002/');
+    $defaultUrl = 'https://prominencebank.com:9002/';
+    // Accept custom URL via shortcode [financial_form url="..."] for testing.
+    $url = isset($atts['url']) ? esc_url_raw($atts['url']) : get_option('faap_frontend_url', $defaultUrl);
+    if (empty($url)) {
+        $url = $defaultUrl;
+    }
     return "<div class='faap-container' style='background:#f4f7f9; padding:10px;'>
         <iframe src='" . esc_url($url) . "' style='width:100%; height:1200px; border:none; box-shadow: 0 10px 30px rgba(0,0,0,0.1);' allow='payment'></iframe>
     </div>";

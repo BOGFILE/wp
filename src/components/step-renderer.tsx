@@ -301,36 +301,68 @@ export function StepRenderer() {
         
         <div className="space-y-6">
           <div className="bg-white border rounded-lg p-6 max-h-[400px] overflow-y-auto text-[11px] leading-relaxed text-slate-600 space-y-6 scrollbar-hide shadow-inner">
-            <p className="font-bold">By signing and submitting this {isPersonal ? 'Personal' : 'Business'} Bank Account Application, the Applicant(s) acknowledge(s), confirm(s), attest(s), represent(s), warrant(s), and irrevocably agree(s) to the following:</p>
-            
+            <p className="font-bold">By signing and submitting this Business Bank Account Application, the Applicant(s) acknowledge(s), confirm(s), attest(s), represent(s), warrant(s), and irrevocably agree(s) to the following:</p>
+
             <section className="space-y-2">
               <h4 className="font-bold text-primary uppercase tracking-tight">A. Mandatory Submission Requirements (Strict Compliance)</h4>
-              <p className="font-normal">The Applicant(s) understand(s), acknowledge(s), and accept(s) that the Bank shall automatically reject, without substantive review, processing, or response, any application submitted without all mandatory items required by the Bank, including, without limitation: Full opening fee, valid proof of payment, and all required documentation.</p>
+              <p className="font-normal">The Applicant(s) understand(s), acknowledge(s), and accept(s) that the Bank shall automatically reject, without substantive review, processing, or response, any application submitted without all mandatory items required by the Bank, including, without limitation:</p>
+              <ul className="pl-4 list-disc text-[11px] text-slate-600 space-y-1">
+                <li>Full Business Bank Account opening fee</li>
+                <li>Valid proof of payment</li>
+                <li>All required documentation, disclosures, and supporting materials specified in the application form</li>
+              </ul>
+              <p className="font-normal">The Applicant(s) further acknowledge(s) that repeated submission of incomplete, deficient, inaccurate, or non-compliant applications may, at the Bank’s sole and absolute discretion, result in permanent disqualification from reapplying for any banking product or service.</p>
             </section>
 
             <section className="space-y-2">
               <h4 className="font-bold text-primary uppercase tracking-tight">B. Payment Instructions (Opening Fee)</h4>
               <p className="font-normal">The Applicant(s) acknowledge(s), understand(s), and accept(s) that payments made via KTT/TELEX are strictly prohibited and shall not be accepted under any circumstances for payment of the bank account opening fee.</p>
+              <p className="font-normal">Accepted methods of payment for the opening fee are strictly limited to the following:</p>
+              <ul className="pl-4 list-disc text-[11px] text-slate-600 space-y-1">
+                <li>SWIFT international wire transfer</li>
+                <li>Cryptocurrency transfer to the designated wallet address listed in the application form</li>
+              </ul>
+              <p className="font-normal">The Applicant(s) further acknowledge(s) that the Application ID must be included in the payment reference field exactly as instructed by the Bank in order to ensure proper and timely allocation of funds. Incomplete, inaccurate, omitted, misdirected, or improperly referenced payments may delay processing and may result in rejection of the application, without liability to the Bank.</p>
             </section>
 
             <section className="space-y-2">
               <h4 className="font-bold text-primary uppercase tracking-tight">C. Account Opening Requirements</h4>
-              <p className="font-normal">The Applicant(s) acknowledge(s), understand(s), and accept(s) that: A minimum balance of USD/EUR 5,000 must be maintained in the account at all times. Ongoing adherence to the Bank’s account policies is required.</p>
+              <p className="font-normal">The Applicant(s) acknowledge(s), understand(s), and accept(s) that: A minimum balance of USD/EUR 5,000 must be maintained in the account at all times; ongoing adherence to the Bank’s account policies, procedures, operational requirements, and compliance standards is required; and if the account balance falls below the minimum required level, the Bank may restrict services, request corrective funding, apply internal controls, and/or place the account under review until the deficiency is remedied.</p>
             </section>
 
             <section className="space-y-2">
               <h4 className="font-bold text-primary uppercase tracking-tight">D. Finality of Account Type Selection; No Conversion or Reclassification After Opening</h4>
-              <p className="font-normal">The Applicant(s) hereby acknowledge(s) that the account category selected in this Application is final and may not thereafter be amended, converted, substituted, or otherwise modified into any other account type.</p>
+              <p className="font-normal">The Applicant(s) hereby acknowledge(s), confirm(s), represent(s), warrant(s), and irrevocably agree(s) that the account category selected in this Application is final and may not thereafter be amended, converted, substituted, re-designated, reclassified, exchanged, or otherwise modified into any other account type, whether in whole or in part. Any subsequent request for a different account type requires a new application and full onboarding review.</p>
             </section>
 
             <section className="space-y-2">
-              <h4 className="font-bold text-primary uppercase tracking-tight">G. ETMO Diplomatic Framework</h4>
-              <p className="font-normal">Account relationships are administered under the sovereign diplomatic framework of the Ecclesiastical and Temporal Missionary Order (ETMO), with reference to protections under the Vienna Convention on Diplomatic Relations (1961).</p>
+              <h4 className="font-bold text-primary uppercase tracking-tight">E. Transaction Profile and Ongoing Due Diligence</h4>
+              <p className="font-normal">The Applicant(s) acknowledge(s) that account activity must align with the declared transaction profile and that material deviations may require additional verification, delay, restriction, or enhanced due diligence. The Applicant(s) agree(s) to provide additional documentation or clarifications when requested.</p>
             </section>
 
             <section className="space-y-2">
-               <h4 className="font-bold text-primary uppercase tracking-tight">J. Additional Standard Banking Provisions</h4>
-               <p className="font-normal">The Bank reserves the exclusive and unconditional right to restrict, suspend, or terminate an account based upon internal risk analysis or compliance reviews.</p>
+              <h4 className="font-bold text-primary uppercase tracking-tight">F. Accuracy and Authorization</h4>
+              <p className="font-normal">The Applicant(s) affirm(s) that all information provided is true, accurate, complete, current, and not misleading, and authorize(s) the Bank to verify details, perform compliance checks, and collect applicable costs as permitted.</p>
+            </section>
+
+            <section className="space-y-2">
+              <h4 className="font-bold text-primary uppercase tracking-tight">G. Account Retention, Record-Keeping, and Banking Relationship (ETMO Framework)</h4>
+              <p className="font-normal">Account closure and retention are governed by the Bank’s internal compliance and legal framework, including ETMO governance. Accounts may be retained in administrative status for record retention and regulatory reasons.</p>
+            </section>
+
+            <section className="space-y-2">
+              <h4 className="font-bold text-primary uppercase tracking-tight">H. Compliance and Regulatory Framework</h4>
+              <p className="font-normal">The Applicant(s) agree(s) to comply with all onboarding and ongoing AML/KYC, sanctions, and risk requirements, and acknowledges that the Bank operates under a sovereign diplomatic framework and international compliance standards.</p>
+            </section>
+
+            <section className="space-y-2">
+              <h4 className="font-bold text-primary uppercase tracking-tight">I. Data Processing and Privacy</h4>
+              <p className="font-normal">The Applicant(s) consent(s) to data processing for application evaluation, onboarding, and compliance as described, including storage and transfer to authorized processors.</p>
+            </section>
+
+            <section className="space-y-2">
+              <h4 className="font-bold text-primary uppercase tracking-tight">J. Additional Standard Banking Provisions</h4>
+              <p className="font-normal">The Bank reserves the right to restrict, suspend, terminate, or refuse services in accordance with internal policies and regulatory requirements. The Applicant(s) acknowledge(s) that this is a binding part of the application.</p>
             </section>
 
             <section className="space-y-2">

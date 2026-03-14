@@ -74,13 +74,25 @@ function ApplicationLayout() {
       if (data.paymentProofFile instanceof File) formBody.append("paymentProofFile", data.paymentProofFile);
       if (data.companyRegFile instanceof File) formBody.append("companyRegFile", data.companyRegFile);
 
-      const apiUrl = process.env.NEXT_PUBLIC_FAAP_API_URL || "http://3.14.204.157";
-      const response = await fetch(`${apiUrl}/wp-json/faap/v1/submit`, {
+      const runtimeApiUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const apiUrl = process.env.NEXT_PUBLIC_FAAP_API_URL || runtimeApiUrl || "http://3.14.204.157";
+      const response = await fetch(`${apiUrl.replace(/\/$/, '')}/wp-json/faap/v1/submit`, {
         method: "POST",
         body: formBody,
       });
 
-      const result = await response.json();
+      const responseText = await response.text();
+      let result: any;
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        throw new Error(`Invalid server response: ${response.status} ${response.statusText}. ${responseText.slice(0, 240)}`);
+      }
+
+      if (!response.ok) {
+        throw new Error(result?.message || result?.error || `Submission failed (${response.status})`);
+      }
+
       if (result.success) {
         toast({
           title: "Application Received",

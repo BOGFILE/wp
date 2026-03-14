@@ -28,13 +28,16 @@ export default function AdminPage() {
       if (response.ok) {
         // Refresh the applications list
         const appsResponse = await fetch("http://3.14.204.157/wp-json/faap/v1/applications");
-        const data = await appsResponse.json();
+        const raw = await appsResponse.text();
+        let data;
+        try { data = JSON.parse(raw); } catch { data = []; }
         setApplications(data);
         
-        // Show success message (you might want to add a toast here)
         alert('Payment verified successfully! Notifications sent to user and admin.');
       } else {
-        alert('Failed to verify payment.');
+        const errText = await response.text();
+        console.error('verify payment failed', errText);
+        alert(`Failed to verify payment: ${response.status} ${response.statusText}`);
       }
     } catch (error) {
       console.error('Error verifying payment:', error);
@@ -46,7 +49,13 @@ export default function AdminPage() {
     async function load() {
       try {
         const response = await fetch("http://3.14.204.157/wp-json/faap/v1/applications");
-        const data = await response.json();
+        const text = await response.text();
+        let data = [];
+        if (response.ok) {
+          try { data = JSON.parse(text); } catch { data = []; }
+        } else {
+          console.error('Applications load failed:', response.status, text);
+        }
         setApplications(data);
       } catch (error) {
         console.error("Failed to load applications:", error);

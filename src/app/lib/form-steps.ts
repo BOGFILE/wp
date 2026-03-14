@@ -25,11 +25,11 @@ export const PERSONAL_STEPS: FormStep[] = [
     title: "IDENTITY",
     description: "Your Personal details:",
     fields: [
-      { id: "f1", label: "Place of birth *", name: "pob", type: "text", width: "half", required: true },
       { id: "f2", label: "First name *", name: "firstName", type: "text", width: "half", required: true },
       { id: "f3", label: "Last name *", name: "lastName", type: "text", width: "half", required: true },
       { id: "f4", label: "Middle name", name: "middleName", type: "text", width: "half" },
       { id: "f5", label: "Date of birth *", name: "dob", type: "date", width: "half", required: true },
+      { id: "f1", label: "Place of birth *", name: "pob", type: "text", width: "half", required: true },
       { id: "f6", label: "Nationality *", name: "nationality", type: "text", width: "half", required: true },
       { id: "f7", label: "Passport/ID No. *", name: "passportNo", type: "text", width: "half", required: true },
       { id: "f8", label: "Passport/ID date of issue *", name: "passportIssue", type: "date", width: "half", required: true },
@@ -185,13 +185,13 @@ Click to expand / view terms`,
     title: "REVIEW",
     description: `AGREED AND ATTESTED
 Details
-By signing and submitting this Personal Bank Account Application, the Applicant(s) acknowledge(s), confirm(s), attest(s), represent(s), warrant(s), and irrevocably agree(s) to the following:
+By signing and submitting this Business Bank Account Application, the Applicant(s) acknowledge(s), confirm(s), attest(s), represent(s), warrant(s), and irrevocably agree(s) to the following:
 
 A. Mandatory Submission Requirements (Strict Compliance)
 
 The Applicant(s) understand(s), acknowledge(s), and accept(s) that the Bank shall automatically reject, without substantive review, processing, or response, any application submitted without all mandatory items required by the Bank, including, without limitation:
 
-• Full Personal Bank Account opening fee
+• Full Business Bank Account opening fee
 
 • Valid proof of payment
 

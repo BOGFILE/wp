@@ -62,16 +62,27 @@ export function FormProvider({ children }: { children: ReactNode }) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-        const response = await fetch(`http://3.14.204.157/wp-json/faap/v1/form-config/${data.type}`, {
+        const runtimeApiUrl = typeof window !== 'undefined' ? window.location.origin : '';
+        const apiUrl = process.env.NEXT_PUBLIC_FAAP_API_URL || runtimeApiUrl || "http://3.14.204.157";
+        const response = await fetch(`${apiUrl.replace(/\/$/, '')}/wp-json/faap/v1/form-config/${data.type}`, {
           signal: controller.signal,
           headers: { 'Accept': 'application/json' },
         });
 
         clearTimeout(timeoutId);
 
-        if (!response.ok) throw new Error("Server error");
-        const config = await response.json();
-        
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`Server error ${response.status}: ${text.slice(0, 240)}`);
+        }
+        const raw = await response.text();
+        let config;
+        try {
+          config = JSON.parse(raw);
+        } catch {
+          config = null;
+        }
+
         if (Array.isArray(config) && config.length > 0) {
           setSteps(config);
         } else {
