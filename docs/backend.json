@@ -1,0 +1,72 @@
+
+{
+  "entities": {
+    "FormStep": {
+      "title": "FormStep",
+      "description": "Definition of a step in the application wizard including its input fields.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "The title of the step" },
+        "description": { "type": "string", "description": "A brief description of the step's purpose" },
+        "order": { "type": "number", "description": "The sequence in which this step appears" },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "name": { "type": "string" },
+              "type": { "type": "string", "enum": ["text", "number", "date", "select", "radio", "textarea"] },
+              "placeholder": { "type": "string" },
+              "required": { "type": "boolean" },
+              "options": { "type": "array", "items": { "type": "string" } },
+              "width": { "type": "string", "enum": ["full", "half"] }
+            }
+          }
+        }
+      }
+    },
+    "AccountType": {
+      "title": "AccountType",
+      "description": "Definition of a banking product available for selection.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "fee": { "type": "string" },
+        "icon": { "type": "string", "description": "Lucide icon name" },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "Application": {
+      "title": "Application",
+      "description": "A submitted bank account application.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["personal", "business"] },
+        "accountTypeId": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Review"] },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "formData": { "type": "object" }
+      }
+    }
+  },
+  "auth": {
+    "providers": ["google.com"]
+  },
+  "firestore": {
+    "/forms/{formType}/steps/{stepId}": {
+      "schema": "FormStep",
+      "description": "Collection of wizard steps"
+    },
+    "/settings/accountTypes/list/{typeId}": {
+      "schema": "AccountType",
+      "description": "Dynamic banking products"
+    },
+    "/applications/{applicationId}": {
+      "schema": "Application",
+      "description": "Stored user applications"
+    }
+  }
+}
