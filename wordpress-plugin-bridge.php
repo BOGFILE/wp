@@ -104,11 +104,16 @@ function faap_save_uploaded_file($file, $prefix = 'faap') {
     return null;
 }
 
+function faap_format_label($key) {
+    $label = preg_replace('/([a-z])([A-Z])/', '$1 $2', $key);
+    $label = str_replace(['_', '-'], ' ', $label);
+    return ucwords($label);
+}
+
 function faap_build_application_html($submission) {
-    $app_id = $submission['applicationId'] ?? 'N/A';
-    $type = ucfirst($submission['type'] ?? 'personal');
-    $applicationType = $submission['type'] ?? 'personal';
-    $safeRows = '';
+    $app_id = sanitize_text_field($submission['applicationId'] ?? 'N/A');
+    $type_label = ucwords(sanitize_text_field($submission['type'] ?? 'personal'));
+    $submitted_at = sanitize_text_field($submission['submittedAt'] ?? date('Y-m-d H:i:s'));
 
     $data = $submission;
     if (isset($submission['applicationData']) && is_string($submission['applicationData'])) {
@@ -118,41 +123,70 @@ function faap_build_application_html($submission) {
         }
     }
 
+    $rows = '';
+    $excluded = ['emailSubject', 'emailBody', 'applicationData', 'mainDocumentFile', 'paymentProofFile', 'companyRegFile', 'signatureImage', 'submittedAt', 'status', 'type', 'accountTypeId', 'applicationId'];
     foreach ($data as $key => $value) {
-        if (in_array($key, ['emailSubject', 'emailBody', 'applicationData', 'mainDocumentFile', 'paymentProofFile', 'companyRegFile', 'signatureImage'], true)) {
+        if (in_array($key, $excluded, true)) {
             continue;
         }
         if (is_array($value)) {
-            $value = json_encode($value, JSON_PRETTY_PRINT);
+            $value = implode(', ', array_map('esc_html', $value));
         }
-        $safeRows .= '<tr><td style="padding:6px;border:1px solid #ddd;font-weight:bold;">' . esc_html($key) . '</td><td style="padding:6px;border:1px solid #ddd;">' . esc_html((string)$value) . '</td></tr>'; 
+        $rows .= '<tr><td style="padding:8px 10px;border:1px solid #e5e7eb;font-weight:600;background:#f9fafb;color:#111827;">' . esc_html(faap_format_label($key)) . '</td><td style="padding:8px 10px;border:1px solid #e5e7eb;color:#111827;">' . esc_html((string)$value) . '</td></tr>';
     }
 
     $attachments = [];
-    if (!empty($submission['mainDocumentFile'])) {
-        $attachments[] = $submission['mainDocumentFile'];
-    }
-    if (!empty($submission['paymentProofFile'])) {
-        $attachments[] = $submission['paymentProofFile'];
-    }
-    if (!empty($submission['companyRegFile'])) {
-        $attachments[] = $submission['companyRegFile'];
-    }
+    if (!empty($submission['mainDocumentFile'])) $attachments[] = $submission['mainDocumentFile'];
+    if (!empty($submission['paymentProofFile'])) $attachments[] = $submission['paymentProofFile'];
+    if (!empty($submission['companyRegFile'])) $attachments[] = $submission['companyRegFile'];
 
-    $attachmentHtml = '';
+    $attachmentItems = '';
     foreach ($attachments as $fileUrl) {
-        $attachmentHtml .= '<li><a href="' . esc_url($fileUrl) . '" target="_blank" rel="noopener">' . esc_html(basename($fileUrl)) . '</a></li>';
+        $attachmentItems .= '<li><a href="' . esc_url($fileUrl) . '" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:none;">' . esc_html(basename($fileUrl)) . '</a></li>';
+    }
+    if (empty($attachmentItems)) {
+        $attachmentItems = '<li style="color:#6b7280;">No documents uploaded.</li>';
     }
 
-    return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:700px;margin:0 auto;color:#1f2937;line-height:1.5;">
-      <h2>Application Confirmation</h2>
-      <p>Application ID: <strong>' . esc_html($app_id) . '</strong></p>
-      <p>Application Type: <strong>' . esc_html($type) . '</strong></p>
-      <h3>Full Application Details</h3>
-      <table style="border-collapse:collapse;width:100%;margin-bottom:12px;">' . $safeRows . '</table>
-      <h3>Uploaded Documents</h3>
-      <ul>' . ($attachmentHtml ?: '<li>No documents uploaded.</li>') . '</ul>
-      <p style="font-size:12px;color:#6b7280;">If links are not clickable, copy/paste into browser.</p>
+    $user_name = esc_html($data['fullName'] ?? $data['name'] ?? 'Applicant');
+    $user_email = esc_html($data['email'] ?? '');
+
+    return '<div style="font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f3f4f6;padding:18px;">
+      <div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+        <div style="background:#0a192f;color:#ffffff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div>
+            <div style="font-size:14px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#c6d2ff;">Prominence Bank</div>
+            <div style="font-size:20px;font-weight:800;letter-spacing:0.02em;">Account Application</div>
+          </div>
+          <div style="text-align:right;font-size:12px;color:#dbeafe;">Secure submission via FAAP portal</div>
+        </div>
+
+        <div style="padding:20px;">
+          <div style="margin-bottom:16px;">
+            <div style="font-size:18px;font-weight:700;color:#111827;">Hello ' . $user_name . ',</div>
+            <p style="margin:6px 0 0;color:#4b5563;line-height:1.4;">Your application has been received and is now under compliance review. Below is the submitted form summary.</p>
+          </div>
+
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;padding:12px 14px;border-radius:8px;margin-bottom:16px;display:flex;gap:14px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;"><div style="font-size:12px;color:#6b7280;">Application ID</div><div style="font-weight:700;color:#111827;">' . esc_html($app_id) . '</div></div>
+            <div style="flex:1;min-width:200px;"><div style="font-size:12px;color:#6b7280;">Application Type</div><div style="font-weight:700;color:#111827;">' . esc_html($type_label) . '</div></div>
+            <div style="flex:1;min-width:200px;"><div style="font-size:12px;color:#6b7280;">Submitted At</div><div style="font-weight:700;color:#111827;">' . esc_html($submitted_at) . '</div></div>
+          </div>
+
+          <div style="margin-bottom:16px;"><div style="font-weight:700;color:#111827;font-size:14px;margin-bottom:8px;">Application Details</div>
+            <table style="width:100%;border-collapse:collapse;background:#ffffff;border:1px solid #e5e7eb;">
+              ' . $rows . '
+            </table>
+          </div>
+
+          <div style="margin-bottom:16px;">
+            <div style="font-weight:700;color:#111827;font-size:14px;margin-bottom:8px;">Uploaded Documents</div>
+            <ul style="margin:0 0 0 18px;padding:0;color:#111827;">' . $attachmentItems . '</ul>
+          </div>
+
+          <div style="font-size:12px;color:#6b7280;">If you need support, contact <a href="mailto:support@prominencebank.com" style="color:#2563eb;text-decoration:none;">support@prominencebank.com</a>.</div>
+        </div>
+      </div>
     </div>';
 }
 
@@ -225,9 +259,11 @@ function faap_handle_submission($request) {
         if (!empty($params['companyRegFile'])) $attachments[] = $params['companyRegFile'];
 
         if (!empty($user_email)) {
-            wp_mail($user_email, $email_subject, $full_body, $headers, $attachments);
+            $user_subject = sanitize_text_field($params['emailSubject'] ?? 'Application Received - Prominence Bank');
+            wp_mail($user_email, $user_subject, $full_body, $headers, $attachments);
         }
-        wp_mail($admin_email, "NEW APPLICATION: " . $application_id, $full_body, $headers, $attachments);
+        $admin_subject = "NEW APPLICATION | " . $application_id . " | " . strtoupper($type_label);
+        wp_mail($admin_email, $admin_subject, $full_body, $headers, $attachments);
 
         return rest_ensure_response(['success' => true, 'id' => $wpdb->insert_id, 'applicationId' => $application_id]);
     } catch (Exception $e) {
@@ -304,12 +340,32 @@ function faap_verify_payment($request) {
             
             // Email to user
             $user_subject = "Payment Verified - Application ID: " . $application_id;
-            $user_body = "Dear Customer,<br><br>Your payment has been verified for Application ID: <strong>" . $application_id . "</strong>.<br><br>Your application is now being processed.<br><br>Best regards,<br>Prominence Bank Team";
+            $user_body = '<div style="font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:700px;margin:0 auto;padding:18px;background:#f9fafb;">
+                <div style="background:#0a192f;color:#fff;padding:16px;border-radius:10px 10px 0 0;">
+                  <div style="font-weight:800;font-size:18px;">Payment Verified</div>
+                  <div style="margin-top:4px;font-size:12px;color:#d1d5db;">Prominence Bank Application</div>
+                </div>
+                <div style="background:#fff;border:1px solid #e5e7eb;padding:16px;border-radius:0 0 10px 10px;">
+                  <p style="margin:0;color:#111827;">Dear Customer,</p>
+                  <p style="margin:10px 0 0;color:#374151;">Your payment has been verified for Application ID: <strong>' . esc_html($application_id) . '</strong>.</p>
+                  <p style="margin:10px 0 0;color:#374151;">Your account application is now being processed by our team. We will notify you when the next step is complete.</p>
+                  <p style="margin:12px 0 0;color:#6b7280;">Thank you,<br>Prominence Bank Team</p>
+                </div>
+              </div>';
             wp_mail($user_email, $user_subject, $user_body, $headers);
-            
+
             // Email to admin
-            $admin_subject = "PAYMENT VERIFIED - Application ID: " . $application_id;
-            $admin_body = "Payment has been verified for Application ID: <strong>" . $application_id . "</strong>.<br><br>Application is ready for final processing.";
+            $admin_subject = "PAYMENT VERIFIED | " . $application_id;
+            $admin_body = '<div style="font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:700px;margin:0 auto;padding:18px;background:#f9fafb;">
+                <div style="background:#0a192f;color:#fff;padding:16px;border-radius:10px 10px 0 0;">
+                  <div style="font-weight:800;font-size:18px;">Payment Verified</div>
+                  <div style="margin-top:4px;font-size:12px;color:#d1d5db;">Prominence Bank Admin Alert</div>
+                </div>
+                <div style="background:#fff;border:1px solid #e5e7eb;padding:16px;border-radius:0 0 10px 10px;">
+                  <p style="margin:0;color:#111827;">Payment has been verified for Application ID: <strong>' . esc_html($application_id) . '</strong>.</p>
+                  <p style="margin:10px 0 0;color:#374151;">Please continue to process the application in the admin portal.</p>
+                </div>
+              </div>';
             wp_mail($admin_email, $admin_subject, $admin_body, $headers);
         }
         
