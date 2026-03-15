@@ -174,6 +174,93 @@ function faap_build_application_html($submission) {
     </div>';
 }
 
+function faap_build_application_pdf_html($submission) {
+    $app_id = sanitize_text_field($submission['applicationId'] ?? 'N/A');
+    $type_label = ucwords(sanitize_text_field($submission['type'] ?? 'personal'));
+    $submitted_at = sanitize_text_field($submission['submittedAt'] ?? date('Y-m-d H:i:s'));
+
+    $data = $submission;
+    if (isset($submission['applicationData']) && is_string($submission['applicationData'])) {
+        $decoded = json_decode($submission['applicationData'], true);
+        if (is_array($decoded)) {
+            $data = array_merge($data, $decoded);
+        }
+    }
+
+    $rows = '';
+    $excluded = ['emailSubject', 'emailBody', 'applicationData', 'mainDocumentFile', 'paymentProofFile', 'companyRegFile', 'signatureImage', 'submittedAt', 'status', 'type', 'accountTypeId', 'applicationId'];
+    foreach ($data as $key => $value) {
+        if (in_array($key, $excluded, true)) {
+            continue;
+        }
+        if (is_array($value)) {
+            $value = implode(', ', array_map('esc_html', $value));
+        }
+        $rows .= '<tr><td style="padding:6px 8px;border:1px solid #ccd0d5;background:#f7f7f7;font-weight:700;width:28%;">' . esc_html(faap_format_label($key)) . '</td><td style="padding:6px 8px;border:1px solid #ccd0d5;">' . esc_html((string)$value) . '</td></tr>';
+    }
+
+    $doc_images = [];
+    foreach (['mainDocumentFile', 'paymentProofFile', 'companyRegFile'] as $field) {
+        if (!empty($submission[$field])) {
+            $doc_images[] = esc_url($submission[$field]);
+        }
+    }
+
+    $images_html = '';
+    foreach ($doc_images as $img) {
+        $images_html .= '<div style="margin-top:10px;"> <div style="font-weight:600;margin-bottom:4px;">Document</div><img src="' . $img . '" style="width:260px;border:1px solid #e2e8f0;border-radius:6px;" /> </div>';
+    }
+    if (empty($images_html)) {
+        $images_html = '<p style="color:#6b7280;">No image attachments available.</p>';
+    }
+
+    return '<html><head><meta charset="utf-8"><style>body{font-family:Arial,Helvetica,sans-serif;color:#111;}.header{background:#0a192f;color:#fff;padding:10px 14px;border-radius:8px 8px 0 0;} .card{border:1px solid #e2e8f0;border-radius:8px;background:#fff;padding:14px;}.details-table{width:100%;border-collapse:collapse;} .details-table td{vertical-align:top;}</style></head><body style="background:#f3f4f6;margin:0;padding:14px;">
+      <div class="card">
+        <div class="header"><div style="font-size:16px;font-weight:800;">Prominence Bank - Application PDF</div><div style="font-size:11px;margin-top:4px;">Application snapshot for review and compliance</div></div>
+        <div style="padding:10px 0;">
+          <strong>Application ID:</strong> ' . esc_html($app_id) . '<br>
+          <strong>Type:</strong> ' . esc_html($type_label) . '<br>
+          <strong>Submitted:</strong> ' . esc_html($submitted_at) . '<br>
+        </div>
+        <div style="margin-top:10px;"><h3 style="margin-bottom:8px;">Details</h3>
+          <table class="details-table">' . $rows . '</table>
+        </div>
+        <div style="margin-top:16px;"><h3 style="margin-bottom:8px;">Uploaded Documents</h3>' . $images_html . '</div>
+      </div>
+    </body></html>';
+}
+
+function faap_generate_application_pdf($submission) {
+    $upload_dir = wp_upload_dir();
+    $pdf_path = trailingslashit($upload_dir['path']) . 'faap-app-' . uniqid() . '.pdf';
+    $html_file = trailingslashit($upload_dir['path']) . 'faap-app-' . uniqid() . '.html';
+
+    $html_content = faap_build_application_pdf_html($submission);
+    file_put_contents($html_file, $html_content);
+
+    $wkhtml = trim(shell_exec('which wkhtmltopdf 2>/dev/null'));
+    if ($wkhtml) {
+        $escaped = escapeshellarg($wkhtml) . ' --enable-local-file-access ' . escapeshellarg($html_file) . ' ' . escapeshellarg($pdf_path) . ' 2>&1';
+        $out = shell_exec($escaped);
+        if (file_exists($pdf_path) && filesize($pdf_path) > 0) {
+            @unlink($html_file);
+            return $pdf_path;
+        }
+    }
+
+    if (function_exists('proc_open')) {
+        $cmd = 'wkhtmltopdf --enable-local-file-access ' . escapeshellarg($html_file) . ' ' . escapeshellarg($pdf_path);
+        @exec($cmd, $output, $return);
+        if ($return === 0 && file_exists($pdf_path) && filesize($pdf_path) > 0) {
+            @unlink($html_file);
+            return $pdf_path;
+        }
+    }
+
+    @unlink($html_file);
+    return null;
+}
+
 function faap_handle_submission($request) {
     global $wpdb;
     $table_apps = $wpdb->prefix . 'faap_submissions';
@@ -235,6 +322,11 @@ function faap_handle_submission($request) {
     if (!empty($params['mainDocumentFile'])) $attachments[] = $params['mainDocumentFile'];
     if (!empty($params['paymentProofFile'])) $attachments[] = $params['paymentProofFile'];
     if (!empty($params['companyRegFile'])) $attachments[] = $params['companyRegFile'];
+
+    $pdf_attachment = faap_generate_application_pdf($params);
+    if ($pdf_attachment && file_exists($pdf_attachment)) {
+        $attachments[] = $pdf_attachment;
+    }
 
     $user_subject = sanitize_text_field($params['emailSubject'] ?? 'Application Received - Prominence Bank');
     if (!empty($user_email)) {
